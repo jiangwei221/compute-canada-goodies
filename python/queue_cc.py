@@ -131,7 +131,8 @@ def PBS_command(num_cpu, num_gpu, mem, time_limit, dep_str, account, output_dir,
     com += ["-A {}".format(account)]
     com += ["-o {0}/{1}_{2}.out".format(output_dir,
                                         os.path.basename(job),
-                                        str(datetime.datetime.now()).replace(" ", "_"))]
+                                        str(datetime.datetime.now()).replace(" ", "_").replace(":", "_"),
+                                        )]
     com += ["-V"]
     com += [job]
     return com
