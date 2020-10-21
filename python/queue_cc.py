@@ -83,8 +83,34 @@ cluster_config = {
             "threads_per_gpu": 7,
             "ram_per_node": 191000,
             "ram_per_gpu": 23875,
+        },
+    "sockeye":
+        {
+            "gpu_model": "v100",
+            "gpus_per_node": 4,
+            "cpu_cores_per_node": 24,
+            "threads_per_node": None,
+            "cpu_cores_per_gpu": 6,
+            "threads_per_gpu": None,
+            "ram_per_node": 191000,
+            "ram_per_gpu": 47750,
         }
 }
+
+
+def slurm_to_PBS(slurm_com):
+    sheet = {'sbatch':                 'qsub',
+             '--cpus-per-task=':       'ncpus=',
+             '--gres=gpu:':            'ngpus=',
+             '--mem=':                 'mem=',
+             '--time=':                'walltime=',
+             '--dependency=afterany:': '-d ',
+             '--account=':             '-A ',
+             '--output=':              '-o ',
+             '--export=ALL':           '-V'}
+    import IPython
+    IPython.embed()
+    assert 0
 
 
 def add_argument_group(name):
@@ -266,6 +292,7 @@ def main(config):
             com += ["--output={}/%x-%j.out".format(config.output_dir)]
             com += ["--export=ALL"]
             com += [os.path.join(config.done_dir, job_script)]
+            slurm_to_PBS(com)
             slurm_res = subprocess.run(com, stdout=subprocess.PIPE)
             print(slurm_res.stdout.decode())
             # Get job ID
