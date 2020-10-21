@@ -267,6 +267,7 @@ def main(config):
     # Get jobs that this new job should depend on.
     job_depends = []
     if config.depends_key != "none":
+        assert cluster_config[cluster]["job_system"] == "slurm"
         squeue_res = subprocess.run(
             ["squeue", "-u", username],
             stdout=subprocess.PIPE
@@ -331,7 +332,7 @@ def main(config):
             print(slurm_res.stdout.decode())
             # Get job ID
             if slurm_res.returncode != 0:
-                raise RuntimeError("Slurm error!")
+                raise RuntimeError("Slurm/PBS error!")
             job_id = slurm_res.stdout.decode().split()[-1]
             dep_str = str(job_id)
 
