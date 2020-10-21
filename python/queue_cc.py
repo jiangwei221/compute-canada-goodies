@@ -34,6 +34,7 @@ import os
 import shutil
 import socket
 import subprocess
+import datetime
 
 # ----------------------------------------
 # Global variables within this script
@@ -128,7 +129,9 @@ def PBS_command(num_cpu, num_gpu, mem, time_limit, dep_str, account, output_dir,
     if len(dep_str) > 0:
         com += ["-d {}".format(dep_str)]
     com += ["-A {}".format(account)]
-    com += ["-o {}/%x-%j.out".format(output_dir)]
+    com += ["-o {0}/{1}_{2}.out".format(output_dir,
+                                        os.path.basename(job),
+                                        str(datetime.datetime.now()).replace(" ", "_"))]
     com += ["-V"]
     com += [job]
     return com
