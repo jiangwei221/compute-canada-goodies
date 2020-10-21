@@ -50,6 +50,7 @@ cluster_config = {
             "threads_per_gpu": 12,
             "ram_per_node": 128000,
             "ram_per_gpu": 31500,
+            "job_system": "slurm",
         },
     "graham":
         {
@@ -61,6 +62,7 @@ cluster_config = {
             "threads_per_gpu": 32,
             "ram_per_node": 127518,
             "ram_per_gpu": 63500,
+            "job_system": "slurm",
         },
     "beluga":
         {
@@ -72,6 +74,7 @@ cluster_config = {
             "threads_per_gpu": 20,
             "ram_per_node": 191000,
             "ram_per_gpu": 47500,
+            "job_system": "slurm",
         },
     "moo":
         {
@@ -83,6 +86,7 @@ cluster_config = {
             "threads_per_gpu": 7,
             "ram_per_node": 191000,
             "ram_per_gpu": 23875,
+            "job_system": "slurm",
         },
     "sockeye":
         {
@@ -94,23 +98,40 @@ cluster_config = {
             "threads_per_gpu": None,
             "ram_per_node": 191000,
             "ram_per_gpu": 47750,
+            "job_system": "PBS",
         }
 }
 
 
-def slurm_to_PBS(slurm_com):
-    sheet = {'sbatch':                 'qsub',
-             '--cpus-per-task=':       'ncpus=',
-             '--gres=gpu:':            'ngpus=',
-             '--mem=':                 'mem=',
-             '--time=':                'walltime=',
-             '--dependency=afterany:': '-d ',
-             '--account=':             '-A ',
-             '--output=':              '-o ',
-             '--export=ALL':           '-V'}
-    import IPython
-    IPython.embed()
-    assert 0
+def slurm_command(num_cpu, num_gpu, mem, time_limit, dep_str, account, output_dir, job):
+    com = ["sbatch"]
+    com += ["--cpus-per-task={}".format(num_cpu)]
+    if num_gpu > 0:
+        com += ["--gres=gpu:{}".format(num_gpu)]
+    com += ["--mem={}".format(mem)]
+    com += ["--time={}".format(time_limit)]
+    if len(dep_str) > 0:
+        com += ["--dependency=afterany:{}".format(dep_str)]
+    com += ["--account={}".format(account)]
+    com += ["--output={}/%x-%j.out".format(output_dir)]
+    com += ["--export=ALL"]
+    com += [job]
+    return com
+
+
+def PBS_command(num_cpu, num_gpu, mem, time_limit, dep_str, account, output_dir, job):
+    com = ["qsub"]
+    if num_gpu > 0:
+        com += ["-l walltime={0},select=1:ncpus={1}:mem={2}:ngpus={3}".format(time_limit, num_cpu, mem, num_gpu)]
+    else:
+        com += ["-l walltime={0},select=1:ncpus={1}:mem={2}".format(time_limit, num_cpu, mem)]
+    if len(dep_str) > 0:
+        com += ["-d {}".format(dep_str)]
+    com += ["-A {}".format(account)]
+    com += ["-o {}/%x-%j.out".format(output_dir)]
+    com += ["-V"]
+    com += [job]
+    return com
 
 
 def add_argument_group(name):
@@ -174,9 +195,9 @@ job_arg.add_argument(
          "CPU core")
 job_arg.add_argument(
     "--time_limit", type=str,
-    default="0-03:00",
+    default="03:00:00",
     help="Time limit on the jobs. If you can, 3 hours give you the best "
-         "turn around.")
+         "turn around. Hours:Minutes:Seconds")
 job_arg.add_argument(
     "--depends_key", type=str,
     default="none",
@@ -280,19 +301,28 @@ def main(config):
         dep_str = ":".join(job_depends)
         # Run job N times
         for idx_run in range(config.num_runs):
-            com = ["sbatch"]
-            com += ["--cpus-per-task={}".format(num_cpu)]
-            if num_gpu > 0:
-                com += ["--gres=gpu:{}".format(num_gpu)]
-            com += ["--mem={}".format(mem)]
-            com += ["--time={}".format(time_limit)]
-            if len(dep_str) > 0:
-                com += ["--dependency=afterany:{}".format(dep_str)]
-            com += ["--account={}".format(config.account)]
-            com += ["--output={}/%x-%j.out".format(config.output_dir)]
-            com += ["--export=ALL"]
-            com += [os.path.join(config.done_dir, job_script)]
-            slurm_to_PBS(com)
+            if cluster_config[cluster]["job_system"] == "slurm":
+                com = slurm_command(num_cpu,
+                                    num_gpu,
+                                    mem,
+                                    time_limit,
+                                    dep_str,
+                                    config.account,
+                                    config.output_dir,
+                                    os.path.join(config.done_dir, job_script))
+            elif cluster_config[cluster]["job_system"] == "PBS":
+                com = PBS_command(num_cpu,
+                                  num_gpu,
+                                  mem,
+                                  time_limit,
+                                  dep_str,
+                                  config.account,
+                                  config.output_dir,
+                                  os.path.join(config.done_dir, job_script))
+            import IPython
+            IPython.embed()
+            assert 0
+            # slurm_to_PBS(com)
             slurm_res = subprocess.run(com, stdout=subprocess.PIPE)
             print(slurm_res.stdout.decode())
             # Get job ID
